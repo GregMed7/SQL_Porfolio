@@ -1,0 +1,153 @@
+SELECT *
+FROM PORFOLIOPROJECT.DBO.COVIDDEATHS
+Where continent is not null
+ORDER BY 3,4 
+
+--SELECT *
+--FROM PORFOLIOPROJECT.DBO.CovidVacination
+--ORDER BY 3,4 
+
+-- SELECT DATAT THAT WE ARE GOING TO BE USING
+
+SELECT LOCATION, DATE, TOTAL_CASES, NEW_CASES, TOTAL_DEATHS, POPULATION
+FROM PorfolioProject.DBO.CovidDeaths
+ORDER BY 1,2
+
+-- LOOKING AT TOTAL CASES VS TOTAL DEATHS
+-- SHOWS LIKELIHOOD OF DYING IF YOU CONTRACT COVID IN YOUR COUNTRY
+
+SELECT LOCATION, DATE, TOTAL_CASES, TOTAL_DEATHS, (TOTAL_DEATHS/TOTAL_CASES)*100 AS DEATHPERCENTAGE
+FROM PorfolioProject.DBO.CovidDeaths
+WHERE LOCATION LIKE '%STATES%'
+ORDER BY 1,2
+
+-- LOOKING AT TOTAL CASES VS POPULATION
+-- SHOWS WHAT PERCENTAGE OF POPULATION GOT COVID
+SELECT LOCATION, DATE, population, TOTAL_CASES, (TOTAL_CASES/population)*100 AS PercentPopulationInfected
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+ORDER BY 1,2
+
+--LOOKING AT COUONTRIES WITH HIGHEST INFECTION RATE COMPARED TO POPULATION
+SELECT LOCATION, population, max(TOTAL_CASES) AS HighestInfectionCount, max((TOTAL_CASES/population))*100 AS PercentPopulationInfected
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+Group By location, population
+ORDER BY PercentPopulationInfected desc
+
+-- Showing Counties with Highest Daeth Counter per Population
+SELECT LOCATION, MAX(cast(total_deaths as int)) AS TotalDeathCount
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+Where continent is not null
+Group By location
+ORDER BY TotalDeathCount desc
+
+
+
+-- LET'S BREAK THINGS DOWN BY CONTINENT
+-- Showing Counties with Highest Daeth Counter per Population
+
+SELECT continent, MAX(cast(total_deaths as int)) AS TotalDeathCount
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+Where continent is not null
+Group By continent
+ORDER BY TotalDeathCount desc
+
+
+
+-- Showing continents with the highest death count per population
+-- Showing Counties with Highest Daeth Counter per Population
+
+SELECT continent, MAX(cast(total_deaths as int)) AS TotalDeathCount
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+Where continent is not null
+Group By continent
+ORDER BY TotalDeathCount desc
+
+
+-- Global Numbers
+SELECT SUM(new_cases) as total_cases, Sum(cast(new_deaths as int)) as total_deaths, SUM(cast(new_deaths as int))/Sum(new_cases)*100 AS DeathPercentage
+FROM PorfolioProject.DBO.CovidDeaths
+--WHERE LOCATION LIKE '%STATES%'
+Where continent is not null
+--Group By date
+ORDER BY 1,2
+
+
+-- Looking at Total Population VS Vacination (Using Partition)
+Select Dea.continent, dea.location, dea.date, dea.population, VAC.new_vaccinations
+, Sum(Convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+-- , (rollingPeopleVaccinated/population)*100
+From PorfolioProject.DBO.CovidDeaths as Dea
+Join PorfolioProject.DBO.CovidVacination as Vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+	Where dea.continent is not null
+Order By 2,3
+
+
+-- Use CTE 
+With PopvsVac (continent, Location, Date, Population, new_vaccinations, RollingPeopleVaccinated)
+as
+(
+Select Dea.continent, dea.location, dea.date, dea.population, VAC.new_vaccinations
+, Sum(Convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+-- , (rollingPeopleVaccinated/population)*100
+From PorfolioProject.DBO.CovidDeaths as Dea
+Join PorfolioProject.DBO.CovidVacination as Vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+	Where dea.continent is not null
+--Order By 2,3
+)
+Select *, (RollingPeopleVaccinated/Population)*100
+From PopvsVac 
+
+-- Temp Table
+
+Drop Table if exists #percentpopulationvaccinated 
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
+
+
+
+Insert Into #PercentPopulationVaccinated
+Select Dea.continent, dea.location, dea.date, dea.population, VAC.new_vaccinations
+, Sum(Convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+-- , (rollingPeopleVaccinated/population)*100
+From PorfolioProject.DBO.CovidDeaths as Dea
+Join PorfolioProject.DBO.CovidVacination as Vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+	Where dea.continent is not null
+--Order By 2,3
+
+
+Select *, (RollingPeopleVaccinated/Population)*100
+From #PercentPopulationVaccinated 
+
+-- Craeting View to store data for later visualizations
+
+Create View PercentPopulationVaccinated as
+Select Dea.continent, dea.location, dea.date, dea.population, VAC.new_vaccinations
+, Sum(Convert(bigint,vac.new_vaccinations)) OVER (Partition by dea.location order by dea.location, dea.date) as RollingPeopleVaccinated
+-- , (rollingPeopleVaccinated/population)*100
+From PorfolioProject.DBO.CovidDeaths as Dea
+Join PorfolioProject.DBO.CovidVacination as Vac
+	On dea.location = vac.location
+	and dea.date = vac.date
+Where dea.continent is not null
+-- Order By 2,3
+
+Select *
+From PercentPopulationVaccinated
